@@ -108,16 +108,6 @@ impl Stakeable {
 
     /**
      * @notice
-     * readonly
-     * calculateStakeReward is used to calculate how much a user should be rewarded for their stakes
-     * and the duration the stake has been active
-     */
-    pub fn calculate_stake_reward(&mut self, _current_stake: AccountId) -> U128 {
-        U128(0)
-    }
-
-    /**
-     * @notice
      * withdrawStake takes in an amount and a index of the stake and will remove tokens from that stake
      * Notice index of the stake is the users stake counter, starting at 0 for the first stake
      * Will return the amount to MINT onto the acount
@@ -126,13 +116,34 @@ impl Stakeable {
     fn _withd_raw_stake(&mut self, amount: U128, index: usize) -> U128 {
         U128(0)
     }
+}
 
+#[near_bindgen]
+impl Stakeable {
+    /**
+     * @notice
+     * readonly
+     * calculateStakeReward is used to calculate how much a user should be rewarded for their stakes
+     * and the duration the stake has been active
+     */
+    pub fn calculate_stake_reward(&mut self, _current_stake: AccountId) -> U128 {
+        U128(0)
+    }
     /**
      * @notice
      * readonly
      * hasStake is used to check if a account has stakes and the total amount along with all the seperate stakes
      */
-    pub fn has_stake(_staker: AccountId) -> StakingSummary {
-        StakingSummary {}
-    }
+    pub fn has_stake(_staker: AccountId) -> StakingSummary {}
+
+    /**
+     * Add functionality like burn to the _stake afunction
+     *
+     */
+    pub fn stake(_amount: U128) {}
+
+    /**
+     * @notice withdrawStake is used to withdraw stakes from the account holder
+     */
+    pub fn withdrawStake(amount: U128, stake_index: usize) {}
 }
