@@ -75,7 +75,7 @@ pub struct Stakeable {
      rewardPerHour is 1000 because it is used to represent 0.001, since we only use integer numbers
      This will give users 0.1% reward for each staked token / H
     */
-    rewardPerHour: usize,
+    reward_per_hour: usize,
 }
 
 impl Default for Stakeable {
@@ -83,7 +83,7 @@ impl Default for Stakeable {
         Self {
             stakeholders: Vec::new(),
             stakes: LookupMap::new(b"stakes".to_vec()),
-            rewardPerHour: REWARD_PER_HOUR,
+            reward_per_hour: REWARD_PER_HOUR,
         }
     }
 }
@@ -170,7 +170,7 @@ impl Stakeable {
         let timestamp = env::block_timestamp_ms();
         return U128(
             (((timestamp - current_stake.since) / ONE_HOUR) as u128 * current_stake.amount.0)
-                / self.rewardPerHour as u128,
+                / self.reward_per_hour as u128,
         );
     }
     /**
@@ -210,5 +210,5 @@ impl Stakeable {
     /**
      * @notice withdrawStake is used to withdraw stakes from the account holder
      */
-    pub fn withdrawStake(amount: U128, stake_index: usize) {}
+    pub fn withdraw_stake(amount: U128, stake_index: usize) {}
 }
