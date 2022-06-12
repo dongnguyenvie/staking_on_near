@@ -2,12 +2,16 @@ use near_sdk::borsh::{self, BorshDeserialize, BorshSerialize};
 use near_sdk::collections::LookupMap;
 use near_sdk::json_types::U128;
 use near_sdk::serde::{Deserialize, Serialize};
-use near_sdk::Gas;
-use near_sdk::{env, ext_contract, near_bindgen, AccountId, PromiseResult};
+use near_sdk::{env, ext_contract, near_bindgen, AccountId, Balance, PromiseResult};
+use near_sdk::{Gas, PanicOnDefault};
 
 pub const REWARD_PER_HOUR: usize = 1_000;
 pub const ONE_HOUR: u64 = 3600_000;
 pub const FT_TRANSFER_GAS: Gas = Gas(10_000_000_000_000);
+
+pub const DEPOSIT_ONE_YOCTO: Balance = 1;
+pub const NO_DEPOSIT: Balance = 0;
+pub const FT_HARVEST_CALLBACK_GAS: Gas = Gas(10_000_000_000_000);
 
 #[ext_contract(ext_ft)]
 trait FungibleToken {
@@ -32,7 +36,8 @@ trait FungibleToken {
  * A Stake will contain the users address, the amount staked and a timestamp,
  * Since which is when the stake was made
  */
-#[derive(Serialize, Deserialize, Clone)]
+
+#[derive(Serialize, Deserialize, BorshSerialize, BorshDeserialize, Clone)]
 #[serde(crate = "near_sdk::serde")]
 pub struct Stake {
     address: AccountId,
@@ -44,7 +49,7 @@ pub struct Stake {
 /**
  * @notice Stakeholder is a staker that has active stakes
  */
-#[derive(Clone)]
+#[derive(Clone, BorshSerialize, BorshDeserialize)]
 pub struct StakeHolder {
     address: AccountId,
     address_stakes: Vec<Stake>,
@@ -67,7 +72,13 @@ pub trait StakeableCallback {
     fn ft_after_transfer_callback(&mut self, amount: U128);
 }
 
+// #[ext_contract(ext_ft_contract)]
+// pub trait FungibleToken {
+//     fn ft_transfer(&mut self, receiver_id: AccountId, amount: U128, memo: Option<String>);
+// }
+
 #[near_bindgen]
+#[derive(PanicOnDefault, BorshSerialize, BorshDeserialize)]
 pub struct Stakeable {
     /**
      * @notice
@@ -190,7 +201,10 @@ impl StakeableCallback for Stakeable {
                 let balance = near_sdk::serde_json::from_slice::<U128>(&result).unwrap();
                 assert!(balance.0 >= amount.0, "Hmmm out of balance");
                 env::log_str(&format!("balanceOf cb={}", &balance.0.to_string()));
+                env::log_str(&format!("nolan_token_id={}", &self.nolan_token_id.clone()));
                 ext_ft::ext(self.nolan_token_id.clone())
+                    .with_static_gas(FT_TRANSFER_GAS)
+                    .with_attached_deposit(DEPOSIT_ONE_YOCTO)
                     .ft_transfer(to.to_string(), amount.0.to_string(), Some("0".to_string()))
                     .then(
                         stakeable_callback::ext(env::current_account_id())
@@ -268,12 +282,17 @@ impl Stakeable {
      * Add functionality like burn to the _stake afunction
      *
      */
+    #[payable]
     pub fn stake(&mut self, amount: U128) {
         assert!(amount.0 > 0, "amount must be greater than zero");
         let account_id: AccountId = env::predecessor_account_id();
 
-        let stakeable_cb_ext = stakeable_callback::ext(env::current_account_id());
+        let stakeable_cb_ext = stakeable_callback::ext(env::current_account_id())
+            .with_static_gas(FT_HARVEST_CALLBACK_GAS)
+            .with_attached_deposit(NO_DEPOSIT);
         ext_ft::ext(self.nolan_token_id.clone())
+            .with_static_gas(FT_HARVEST_CALLBACK_GAS)
+            .with_attached_deposit(NO_DEPOSIT)
             .ft_balance_of(account_id.to_string())
             .then(stakeable_cb_ext.ft_transfer_callback(
                 account_id,
