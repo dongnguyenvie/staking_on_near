@@ -94,9 +94,9 @@ function NearProvider({ children }: NearProviderProps) {
     if (!walletReady) return
     wallet!.requestSignIn(
       '', // contract requesting access
-      'Nearlend Nolan App', // optional
-      'http://localhost:3000/markets?flg=success', // optional
-      'http://localhost:3000/markets?flg=failure'
+      'Nolan App' // optional
+      // 'http://localhost:3000/markets?flg=success', // optional
+      // 'http://localhost:3000/markets?flg=failure'
     )
   }
 
