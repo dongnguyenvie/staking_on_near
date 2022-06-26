@@ -1,8 +1,10 @@
 use near_sdk::borsh::{self, BorshDeserialize, BorshSerialize};
 use near_sdk::collections::LookupMap;
-use near_sdk::json_types::U128;
+use near_sdk::json_types::{ValidAccountId, U128};
 use near_sdk::serde::{Deserialize, Serialize};
-use near_sdk::{env, ext_contract, near_bindgen, AccountId, Balance, PromiseResult};
+use near_sdk::{
+    env, ext_contract, near_bindgen, AccountId, Balance, PromiseOrValue, PromiseResult,
+};
 use near_sdk::{Gas, PanicOnDefault};
 
 pub const REWARD_PER_HOUR: usize = 1_000;
@@ -29,6 +31,11 @@ trait FungibleToken {
     fn ft_total_supply(&self) -> String;
     fn ft_balance_of(&self, account_id: String) -> String;
 }
+
+// #[ext_contract(ext_self)]
+// pub trait StakeableCallback {
+//     fn ft_on_transfer(&mut self, sender_id: ValidAccountId, amount: U128, msg: String) -> String;
+// }
 
 /**
  * @notice
@@ -65,17 +72,6 @@ pub struct StakingSummary {
     total_amount: U128,
     stakes: Vec<Stake>,
 }
-
-#[ext_contract(stakeable_callback)]
-pub trait StakeableCallback {
-    fn ft_transfer_callback(&mut self, from: AccountId, to: AccountId, amount: U128);
-    fn ft_after_transfer_callback(&mut self, amount: U128);
-}
-
-// #[ext_contract(ext_ft_contract)]
-// pub trait FungibleToken {
-//     fn ft_transfer(&mut self, receiver_id: AccountId, amount: U128, memo: Option<String>);
-// }
 
 #[near_bindgen]
 #[derive(PanicOnDefault, BorshSerialize, BorshDeserialize)]
@@ -149,10 +145,10 @@ impl Stakeable {
      * _Stake is used to make a stake for an sender. It will remove the amount staked from the stakers account and place those tokens inside a stake container
      * StakeID
      */
-    fn _stake(&mut self, amount: U128) {
+    fn _stake(&mut self, sender: AccountId, amount: U128) {
         assert!(amount.0 > 0, "Cannot stake nothing");
         let index: usize;
-        let sender = env::signer_account_id();
+        // let sender = env::signer_account_id();
         // Mappings in solidity creates all values, but empty, so we can just check the address
         match self.stakes.get(&sender) {
             Some(_index) => {
@@ -192,43 +188,6 @@ impl Stakeable {
 }
 
 #[near_bindgen]
-impl StakeableCallback for Stakeable {
-    #[private]
-    fn ft_transfer_callback(&mut self, from: AccountId, to: AccountId, amount: U128) {
-        match env::promise_result(0) {
-            PromiseResult::NotReady => unreachable!(),
-            PromiseResult::Successful(result) => {
-                let balance = near_sdk::serde_json::from_slice::<U128>(&result).unwrap();
-                assert!(balance.0 >= amount.0, "Hmmm out of balance");
-                env::log_str(&format!("balanceOf cb={}", &balance.0.to_string()));
-                env::log_str(&format!("nolan_token_id={}", &self.nolan_token_id.clone()));
-                ext_ft::ext(self.nolan_token_id.clone())
-                    .with_static_gas(FT_TRANSFER_GAS)
-                    .with_attached_deposit(DEPOSIT_ONE_YOCTO)
-                    .ft_transfer(to.to_string(), amount.0.to_string(), Some("0".to_string()))
-                    .then(
-                        stakeable_callback::ext(env::current_account_id())
-                            .ft_after_transfer_callback(amount),
-                    );
-            }
-            PromiseResult::Failed => {}
-        }
-    }
-
-    #[private]
-    fn ft_after_transfer_callback(&mut self, amount: U128) {
-        match env::promise_result(0) {
-            PromiseResult::NotReady => unreachable!(),
-            PromiseResult::Successful(result) => {
-                env::log_str("stake successfully");
-                self.stake(amount);
-            }
-            PromiseResult::Failed => {}
-        }
-    }
-}
-
-#[near_bindgen]
 impl Stakeable {
     /**
      * @notice
@@ -236,7 +195,7 @@ impl Stakeable {
      * calculateStakeReward is used to calculate how much a user should be rewarded for their stakes
      * and the duration the stake has been active
      */
-    pub fn calculate_stake_reward(&mut self, current_stake: Stake) -> U128 {
+    pub fn calculate_stake_reward(&self, current_stake: Stake) -> U128 {
         // First calculate how long the stake has been active
         // Use current seconds since epoch - the seconds since epoch the stake was made
         // The output will be duration in SECONDS ,
@@ -256,7 +215,7 @@ impl Stakeable {
      * readonly
      * hasStake is used to check if a account has stakes and the total amount along with all the seperate stakes
      */
-    pub fn has_stake(&mut self, _staker: AccountId) -> StakingSummary {
+    pub fn has_stake(&self, _staker: AccountId) -> StakingSummary {
         // totalStakeAmount is used to count total staked amount of the address
         let mut total_stake_amount: U128 = U128(0);
         let stake_index = self.stakes.get(&_staker).unwrap();
@@ -267,42 +226,80 @@ impl Stakeable {
             total_amount: U128(0),
             stakes: stakeholder.address_stakes,
         };
+
         // Itterate all stakes and grab amount of stakes
         for stake in summary.stakes.iter_mut() {
             let available_reward = self.calculate_stake_reward(stake.to_owned());
             stake.claimable = available_reward;
             total_stake_amount = U128(total_stake_amount.0 + stake.amount.0);
         }
+
         // // Assign calculate amount to summary
         summary.total_amount = total_stake_amount;
         return summary;
     }
 
-    /**
-     * Add functionality like burn to the _stake afunction
-     *
-     */
-    #[payable]
-    pub fn stake(&mut self, amount: U128) {
-        assert!(amount.0 > 0, "amount must be greater than zero");
-        let account_id: AccountId = env::predecessor_account_id();
+    // /**
+    //  * Add functionality like burn to the _stake afunction
+    //  *
+    //  */
+    // #[payable]
+    // pub fn stake(&mut self, amount: U128) {
+    //     // A -> sender    => A(client) call B => C
+    //     // B
+    //     // cross contract  C
+    //     // C -> b
+    //     assert!(amount.0 > 0, "amount must be greater than zero");
+    //     env::log_str(&format!(
+    //         "current_account_id={}",
+    //         env::current_account_id().to_string()
+    //     ));
 
-        let stakeable_cb_ext = stakeable_callback::ext(env::current_account_id())
-            .with_static_gas(FT_HARVEST_CALLBACK_GAS)
-            .with_attached_deposit(NO_DEPOSIT);
-        ext_ft::ext(self.nolan_token_id.clone())
-            .with_static_gas(FT_HARVEST_CALLBACK_GAS)
-            .with_attached_deposit(NO_DEPOSIT)
-            .ft_balance_of(account_id.to_string())
-            .then(stakeable_cb_ext.ft_transfer_callback(
-                account_id,
-                env::current_account_id(),
-                amount,
-            ));
-    }
+    //     env::log_str(&format!(
+    //         "current_account_id={}",
+    //         env::current_account_id().to_string()
+    //     ));
+
+    //     let account_id = env::predecessor_account_id();
+
+    //     let ext_ft = ext_self::ext(env::current_account_id())
+    //         .with_static_gas(FT_HARVEST_CALLBACK_GAS)
+    //         .with_attached_deposit(NO_DEPOSIT);
+    //     ext_ft::ext(self.nolan_token_id.clone())
+    //         .with_static_gas(FT_HARVEST_CALLBACK_GAS)
+    //         .with_attached_deposit(NO_DEPOSIT)
+    //         .ft_balance_of(account_id.to_string())
+    //         .then(ext_ft.ft_transfer_callback(account_id, env::current_account_id(), amount));
+    // }
 
     /**
      * @notice withdrawStake is used to withdraw stakes from the account holder
      */
     pub fn withdraw_stake(amount: U128, stake_index: usize) {}
+}
+
+#[near_bindgen]
+impl Stakeable {
+    pub fn ft_on_transfer(
+        &mut self,
+        sender_id: ValidAccountId,
+        amount: U128,
+        msg: String,
+    ) -> String {
+        let processor = env::predecessor_account_id();
+        let account_id = env::signer_account_id();
+        assert_ne!(processor, account_id.clone(), "Oops1");
+        assert!(amount.0 > 0, "Oops2");
+        match msg.as_str() {
+            "staking" => {
+                self._stake(sender_id.clone(), amount);
+                format!(
+                    "Account={} stake {} is successfully",
+                    sender_id.to_string(),
+                    amount.0.to_string()
+                )
+            }
+            _ => "Oops".to_string(),
+        }
+    }
 }

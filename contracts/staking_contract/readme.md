@@ -13,5 +13,9 @@ PanicOnDefault => {
 ```
 
 ```bash
-near call dev-1654609907459-16983689322351 stake '{"amount": "6000" }' --accountId nolannguyen.testnet --gas 300000000000000 --depositYocto 1
+# near call dev-1654609907459-16983689322351 stake '{"amount": "6000" }' --accountId nolannguyen.testnet --gas 300000000000000 --depositYocto 1
+
+near view dev-1654609907459-16983689322351 has_stake '{"_staker": "nolannguyen.testnet" }' --accountId nolannguyen.testnet
+
+near call dev-1653846714290-58446128043200 storage_deposit '{}'  --accountId dev-1654609907459-16983689322351 --amount 0.00235
 ```
