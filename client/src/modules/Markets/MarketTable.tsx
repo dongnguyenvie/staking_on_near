@@ -1,4 +1,3 @@
-import { Supplied, TokenConfig } from '#types/defiContract'
 import { cashFormatter, percentFormatter } from '#utils/formatter'
 import { Button, Image } from '@chakra-ui/react'
 
@@ -40,7 +39,7 @@ interface Assets {
   priceUsd: number
   reserved: string
   last_update_timestamp: string
-  config: TokenConfig
+  config: any
   borrowAPY: number
   supplyAPY: number
 }
@@ -74,8 +73,8 @@ export function MarketTable({ assets }: MarketTableProps) {
                 <div className="flex items-center">
                   <Image src={item.thumbnail} w="40px" />
                   <div className="ml-1 flex flex-col justify-start text-left">
-                    <span className='text-xl'>{item.symbol}</span>
-                    <span className='text-xs text-gray-500'>{item.name}</span>
+                    <span className="text-xl">{item.symbol}</span>
+                    <span className="text-xs text-gray-500">{item.name}</span>
                   </div>
                 </div>
               </th>
