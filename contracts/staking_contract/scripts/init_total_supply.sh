@@ -7,7 +7,7 @@ CONTRACT_NAME=$(cat ./neardev/dev-account )
 
 # near call $CONTRACT_NAME new '{"owner_id": "'$OWNER_ID'", "total_supply": "1000000000000000000000000000", "metadata": { "spec": "ft-1.0.0", "name": "Nolan Token", "symbol": "NTK", "decimals": 18 }}' --accountId $CONTRACT_NAME
 
-near call $CONTRACT_NAME new '{"owner_id": "'$OWNER_ID'", "nolan_token_id": "dev-1653846714290-58446128043200"}' --accountId $CONTRACT_NAME
+near call $CONTRACT_NAME new '{"owner_id": "'$OWNER_ID'"}' --accountId $CONTRACT_NAME
 
 # near call stake 
 

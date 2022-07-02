@@ -18,4 +18,36 @@ PanicOnDefault => {
 near view dev-1654609907459-16983689322351 has_stake '{"_staker": "nolannguyen.testnet" }' --accountId nolannguyen.testnet
 
 near call dev-1653846714290-58446128043200 storage_deposit '{}'  --accountId dev-1654609907459-16983689322351 --amount 0.00235
+
+# near call dev-1656265123675-10728825751930 new '{}'
+near call dev-1656267374524-76899217654291 ft_on_transfer '{"sender_id":"dev-1654609907459-16983689322351", "amount": "1000", "msg":"staking"}' --accountId dev-1654609907459-16983689322351
+near view dev-1656265123675-10728825751930 has_stake '{"_staker": "dev-1654609907459-16983689322351" }' --accountId nolannguyen.testnet
+```
+
+### apply algorithm to caculate award for staking token
+```
+- user will give 0.1% per hour
+- (((now - locked_time) / 1hour) * locked_amount) * 0.1% => (((now - locked_time) / 1hour) * locked_amount) / 1000
+```
+
+
+```
+1000
+
+
+(1000 - 500) / 
+
+
+(((block.timestamp - _current_stake.since) / 1 hours) * _current_stake.amount) / rewardPerHour;
+
+timelock / 1hour
+hour_time_lock * amount
+(1000 * 5000) / 
+
+1h = 0.1%
+100h = 10%
+lock = 1000
+=> 1100
+100 * 1000 / 0.1
+
 ```
