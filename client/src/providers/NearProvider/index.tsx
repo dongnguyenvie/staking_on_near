@@ -37,6 +37,7 @@ interface INearContext {
 
   onStake: (params: { amount: string }) => Promise<any>
   accountId: string
+  storageBalance: any
 }
 const NearContext = createContext<INearContext>({} as unknown as INearContext)
 type NearProviderProps = {
@@ -47,6 +48,7 @@ function NearProvider({ children }: NearProviderProps) {
   const [near, setNear] = useState<Near>()
   const [wallet, setWallet] = useState<WalletConnection>()
   const [nearLoading, setNearLoading] = useState(false)
+  const [storageBalance, setStorageBalance] = useState<any>(null)
   const [walletLoading, setWalletLoading] = useState(false)
   const stakingContract = useStakingContract({ wallet: wallet! })
   const tokenContract = useTokenContract({ wallet: wallet! })
@@ -109,9 +111,13 @@ function NearProvider({ children }: NearProviderProps) {
       '1'
     )
 
-    console.log({ resp })
-
     return resp
+  }
+
+  const fetchStorageBalance = async ({ accountId }: any) => {
+    const { contract, ready } = tokenContract
+    const resp = await contract.storage_balance_of({ account_id: accountId })
+    setStorageBalance(resp)
   }
 
   useEffect(() => {
@@ -121,6 +127,11 @@ function NearProvider({ children }: NearProviderProps) {
   useEffect(() => {
     connectWallet()
   }, [near])
+
+  useEffect(() => {
+    if (!accountId) return
+    fetchStorageBalance({ accountId })
+  }, [accountId])
 
   return (
     <NearContext.Provider
@@ -136,6 +147,7 @@ function NearProvider({ children }: NearProviderProps) {
         stakingContract: stakingContract,
         onStake: stake,
         accountId: accountId,
+        storageBalance: storageBalance,
       }}
     >
       {children}

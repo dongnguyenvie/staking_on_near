@@ -20,7 +20,7 @@ near view dev-1654609907459-16983689322351 has_stake '{"_staker": "nolannguyen.t
 near call dev-1653846714290-58446128043200 storage_deposit '{}'  --accountId dev-1654609907459-16983689322351 --amount 0.00235
 
 # near call dev-1656265123675-10728825751930 new '{}'
-near call dev-1656267374524-76899217654291 ft_on_transfer '{"sender_id":"dev-1654609907459-16983689322351", "amount": "1000", "msg":"staking"}' --accountId dev-1654609907459-16983689322351
+near call dev-1656267374524-76899217654291 ft_on_transfer '{"sender_id":"nolannguyen.testnet", "amount": "1000", "msg":"staking"}' --accountId nolannguyen.testnet
 near view dev-1656265123675-10728825751930 has_stake '{"_staker": "dev-1654609907459-16983689322351" }' --accountId nolannguyen.testnet
 ```
 
@@ -50,4 +50,14 @@ lock = 1000
 => 1100
 100 * 1000 / 0.1
 
+```
+
+
+### Testing staking and withdraw
+```
+near call dev-1656267374524-76899217654291 ft_on_transfer '{"sender_id":"nolannguyen.testnet", "amount": "1000", "msg":"staking"}' --accountId nolannguyen.testnet
+
+near view dev-1656267374524-76899217654291 has_stake '{"staker":"nolannguyen.testnet"}' --accountId nolannguyen.testnet
+
+near call dev-1656267374524-76899217654291 withdraw_stake '{"amount": "400", "stake_index": 0}' --accountId nolannguyen.testnet
 ```

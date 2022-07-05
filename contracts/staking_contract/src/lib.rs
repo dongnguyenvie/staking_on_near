@@ -9,6 +9,9 @@ use near_sdk::{
 };
 use near_sdk::{Gas, PanicOnDefault};
 
+mod config;
+use crate::config::*;
+
 pub const REWARD_PER_HOUR: usize = 1_000;
 pub const ONE_HOUR: u64 = 3600_000;
 pub const FT_TRANSFER_GAS: Gas = Gas(10_000_000_000_000);
@@ -84,10 +87,10 @@ pub struct Stakeable {
      rewardPerHour is 1000 because it is used to represent 0.001, since we only use integer numbers
      This will give users 0.1% reward for each staked token / H
     */
-    reward_per_hour: usize,
-
+    // reward_per_hour: usize,
     owner_id: AccountId,
     allowed_token: LookupSet<AccountId>,
+    config: Config,
 }
 
 #[near_bindgen]
@@ -96,9 +99,10 @@ impl Stakeable {
     pub fn new(owner_id: AccountId) -> Self {
         Self {
             stakeholders: LookupMap::new(b"stakeholders".to_vec()),
-            reward_per_hour: REWARD_PER_HOUR,
+            // reward_per_hour: REWARD_PER_HOUR,
             owner_id,
             allowed_token: LookupSet::new(b"allowedToken".to_vec()),
+            config: Config::default(),
         }
     }
 }
@@ -204,9 +208,17 @@ impl Stakeable {
         // we then multiply each token by the hours staked , then divide by the rewardPerHour rate
         // return (((block.timestamp - _current_stake.since) / 1 hours) * _current_stake.amount) / rewardPerHour;
         let timestamp = env::block_timestamp_ms();
+        let duration = (timestamp - current_stake.since) as u128;
+        env::log_str(format!("timestamp={}", timestamp.to_string(),).as_str());
         return U128(
-            (((timestamp - current_stake.since) / ONE_HOUR) as u128 * current_stake.amount.0)
-                / self.reward_per_hour as u128,
+            ((duration
+                * current_stake.amount.0
+                * self.config.reward_numerator as u128
+                * self.config.decimals as u128
+                * current_stake.amount.0
+                * self.config.reward_numerator as u128)
+                / ONE_HOUR as u128)
+                / self.config.reward_denumerator as u128,
         );
     }
     /**
@@ -227,7 +239,8 @@ impl Stakeable {
 
         // Itterate all stakes and grab amount of stakes
         for stake in summary.stakes.iter_mut() {
-            let available_reward = self.calculate_stake_reward(stake.to_owned());
+            let available_reward = self.calculate_stake_reward(stake.clone());
+            env::log_str(format!("claimable_amount={}", available_reward.0.to_string(),).as_str());
             stake.claimable = available_reward;
             total_stake_amount = U128(total_stake_amount.0 + stake.amount.0);
         }
@@ -244,6 +257,11 @@ impl Stakeable {
         let claimable_amount = self._with_draw_stake(amount, stake_index);
         log_str(format!("claimable_amount={}", claimable_amount.0.to_string(),).as_str());
         // TODO: transfer token to receiver
+    }
+
+    // * readonly
+    pub fn decimals(&self) -> u32 {
+        return self.config.decimals;
     }
 }
 

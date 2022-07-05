@@ -16,6 +16,7 @@
     "@fortawesome/free-solid-svg-icons": "^6.1.1",
     "@fortawesome/react-fontawesome": "^0.1.18",
     "@rollup/plugin-alias": "^3.1.9",
+    "dayjs": "^1.11.3",
     "framer-motion": "^6.3.2",
     "lodash": "^4.17.21",
     "near-api-js": "^0.44.2",
