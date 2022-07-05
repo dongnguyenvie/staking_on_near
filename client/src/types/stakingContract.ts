@@ -3,6 +3,7 @@ import { Contract } from 'near-api-js'
 export interface StakingContract extends Contract {
   has_stake(payload?: { staker: string }): Promise<HasStakeResp>
   decimals(): Promise<number>
+  reward_per_hour(): Promise<number>
 }
 
 interface HasStakeResp {

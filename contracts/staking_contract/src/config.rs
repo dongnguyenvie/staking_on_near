@@ -16,7 +16,7 @@ impl Default for Config {
         Self {
             reward_numerator: 15,
             reward_denumerator: 1000,
-            decimals: 10 ^ 15,
+            decimals: 15,
         }
     }
 }
