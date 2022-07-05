@@ -12,7 +12,7 @@ const assetIds = Object.keys(tokenConfig)
 
 const initContract = (wallet: WalletConnection) =>
   new nearAPI.Contract(wallet.account(), TOKEN_NEP141_CONTRACT, {
-    viewMethods: [],
+    viewMethods: ['storage_balance_of'],
     changeMethods: ['ft_transfer_call'],
   }) as TokenNep141Contract
 

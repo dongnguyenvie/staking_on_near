@@ -6,6 +6,10 @@ export interface TokenNep141Contract extends Contract {
     gas?: string,
     attachedDeposit?: string
   ): Promise<any>
+
+  storage_balance_of(payload: {
+    account_id: string
+  }): Promise<null | { total: string; available: string }>
 }
 
 // near call dev-1653846714290-58446128043200

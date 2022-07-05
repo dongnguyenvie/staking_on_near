@@ -1,11 +1,16 @@
 use near_sdk::borsh::{self, BorshDeserialize, BorshSerialize};
 use near_sdk::collections::LookupMap;
+use near_sdk::collections::LookupSet;
+use near_sdk::env::log_str;
 use near_sdk::json_types::{ValidAccountId, U128};
 use near_sdk::serde::{Deserialize, Serialize};
 use near_sdk::{
     env, ext_contract, near_bindgen, AccountId, Balance, PromiseOrValue, PromiseResult,
 };
 use near_sdk::{Gas, PanicOnDefault};
+
+mod config;
+use crate::config::*;
 
 pub const REWARD_PER_HOUR: usize = 1_000;
 pub const ONE_HOUR: u64 = 3600_000;
@@ -31,11 +36,6 @@ trait FungibleToken {
     fn ft_total_supply(&self) -> String;
     fn ft_balance_of(&self, account_id: String) -> String;
 }
-
-// #[ext_contract(ext_self)]
-// pub trait StakeableCallback {
-//     fn ft_on_transfer(&mut self, sender_id: ValidAccountId, amount: U128, msg: String) -> String;
-// }
 
 /**
  * @notice
@@ -81,44 +81,28 @@ pub struct Stakeable {
      *   This is a array where we store all Stakes that are performed on the Contract
      *   The stakes for each address are stored at a certain index, the index can be found using the stakes mapping
      */
-    stakeholders: Vec<StakeHolder>,
-    /**
-     * @notice
-     * stakes is used to keep track of the INDEX for the stakers in the stakes array
-     */
-    stakes: LookupMap<AccountId, usize>,
+    stakeholders: LookupMap<AccountId, StakeHolder>,
     /**
     * @notice
      rewardPerHour is 1000 because it is used to represent 0.001, since we only use integer numbers
      This will give users 0.1% reward for each staked token / H
     */
-    reward_per_hour: usize,
-
-    nolan_token_id: AccountId,
+    // reward_per_hour: usize,
     owner_id: AccountId,
+    allowed_token: LookupSet<AccountId>,
+    config: Config,
 }
-
-// impl Default for Stakeable {
-//     fn default() -> Self {
-//         Self {
-//             stakeholders: Vec::new(),
-//             stakes: LookupMap::new(b"stakes".to_vec()),
-//             reward_per_hour: REWARD_PER_HOUR,
-//             nolan_token_id: "",
-//         }
-//     }
-// }
 
 #[near_bindgen]
 impl Stakeable {
     #[init]
-    pub fn new(owner_id: AccountId, nolan_token_id: AccountId) -> Self {
+    pub fn new(owner_id: AccountId) -> Self {
         Self {
-            stakeholders: Vec::new(),
-            stakes: LookupMap::new(b"stakes".to_vec()),
-            reward_per_hour: REWARD_PER_HOUR,
-            nolan_token_id,
+            stakeholders: LookupMap::new(b"stakeholders".to_vec()),
+            // reward_per_hour: REWARD_PER_HOUR,
             owner_id,
+            allowed_token: LookupSet::new(b"allowedToken".to_vec()),
+            config: Config::default(),
         }
     }
 }
@@ -128,16 +112,13 @@ impl Stakeable {
     /**
      * @notice _addStakeholder takes care of adding a stakeholder to the stakeholders array
      */
-    fn _add_stakeholder(&mut self, stake_id: AccountId) -> usize {
+    fn _add_stakeholder(&mut self, stake_id: AccountId) -> StakeHolder {
         let stakeholder: StakeHolder = StakeHolder {
             address: stake_id.to_owned(),
             address_stakes: Vec::new(),
         };
-        self.stakeholders.push(stakeholder);
-        let user_index: usize = self.stakeholders.len() - 1;
-        self.stakes.insert(&stake_id, &user_index);
-
-        return user_index;
+        self.stakeholders.insert(&stake_id, &stakeholder);
+        return stakeholder;
     }
 
     /**
@@ -147,29 +128,27 @@ impl Stakeable {
      */
     fn _stake(&mut self, sender: AccountId, amount: U128) {
         assert!(amount.0 > 0, "Cannot stake nothing");
-        let index: usize;
-        // let sender = env::signer_account_id();
         // Mappings in solidity creates all values, but empty, so we can just check the address
-        match self.stakes.get(&sender) {
-            Some(_index) => {
-                index = _index;
-            }
+        match self.stakeholders.get(&sender) {
             None => {
-                index = self._add_stakeholder(sender.to_owned());
+                self._add_stakeholder(sender.clone());
             }
+            Some(_) => (),
         }
 
-        env::log_str(&format!("index={}", index.to_string()));
+        env::log_str(&format!("stakeholder={}", sender.clone().to_string()));
 
-        match self.stakeholders.get_mut(index) {
-            Some(stakeholder) => {
+        match self.stakeholders.get(&sender) {
+            Some(mut stakeholder) => {
                 let stake = Stake {
-                    address: sender,
+                    address: sender.clone(),
                     amount: amount,
                     since: env::block_timestamp_ms(),
                     claimable: U128(0),
                 };
                 stakeholder.address_stakes.push(stake);
+                // overwrite new data
+                self.stakeholders.insert(&sender, &stakeholder);
             }
             None => {}
         }
@@ -182,13 +161,37 @@ impl Stakeable {
      * Will return the amount to MINT onto the acount
      * Will also calculateStakeReward and reset timer
      */
-    fn _withd_raw_stake(&mut self, amount: U128, index: usize) -> U128 {
-        U128(0)
+    fn _with_draw_stake(&mut self, amount: U128, index: usize) -> U128 {
+        let account_id = env::signer_account_id();
+        match self.stakeholders.get(&account_id) {
+            Some(mut stakeholder) => {
+                let current_stake = stakeholder.address_stakes.get_mut(index).unwrap();
+                assert!(
+                    current_stake.amount.0 >= amount.0,
+                    "Staking: Cannot withdraw more than you have staked"
+                );
+                let reward = self.calculate_stake_reward(current_stake.clone());
+                current_stake.amount = U128(current_stake.amount.0 - amount.0);
+                current_stake.since = env::block_timestamp_ms();
+                if (current_stake.amount.0 == 0) {
+                    stakeholder.address_stakes.remove(index);
+                } else {
+                    // update value
+                    self.stakeholders.insert(&account_id, &stakeholder);
+                }
+                return U128(amount.0 + reward.0);
+            }
+            None => todo!(),
+        }
     }
 }
 
 #[near_bindgen]
 impl Stakeable {
+    pub fn allow_token(&mut self, token_id: AccountId) -> String {
+        self.allowed_token.insert(&token_id);
+        token_id.to_string()
+    }
     /**
      * @notice
      * readonly
@@ -205,9 +208,17 @@ impl Stakeable {
         // we then multiply each token by the hours staked , then divide by the rewardPerHour rate
         // return (((block.timestamp - _current_stake.since) / 1 hours) * _current_stake.amount) / rewardPerHour;
         let timestamp = env::block_timestamp_ms();
+        let duration = (timestamp - current_stake.since) as u128;
+        env::log_str(format!("timestamp={}", timestamp.to_string(),).as_str());
         return U128(
-            (((timestamp - current_stake.since) / ONE_HOUR) as u128 * current_stake.amount.0)
-                / self.reward_per_hour as u128,
+            ((duration
+                * current_stake.amount.0
+                * self.config.reward_numerator as u128
+                * self.config.decimals as u128
+                * current_stake.amount.0
+                * self.config.reward_numerator as u128)
+                / ONE_HOUR as u128)
+                / self.config.reward_denumerator as u128,
         );
     }
     /**
@@ -215,11 +226,10 @@ impl Stakeable {
      * readonly
      * hasStake is used to check if a account has stakes and the total amount along with all the seperate stakes
      */
-    pub fn has_stake(&self, _staker: AccountId) -> StakingSummary {
+    pub fn has_stake(&self, staker: AccountId) -> StakingSummary {
         // totalStakeAmount is used to count total staked amount of the address
         let mut total_stake_amount: U128 = U128(0);
-        let stake_index = self.stakes.get(&_staker).unwrap();
-        let stakeholder = self.stakeholders.get(stake_index).unwrap().clone();
+        let stakeholder = self.stakeholders.get(&staker).unwrap().clone();
 
         // Keep a summary in memory since we need to calculate this
         let mut summary = StakingSummary {
@@ -229,7 +239,8 @@ impl Stakeable {
 
         // Itterate all stakes and grab amount of stakes
         for stake in summary.stakes.iter_mut() {
-            let available_reward = self.calculate_stake_reward(stake.to_owned());
+            let available_reward = self.calculate_stake_reward(stake.clone());
+            env::log_str(format!("claimable_amount={}", available_reward.0.to_string(),).as_str());
             stake.claimable = available_reward;
             total_stake_amount = U128(total_stake_amount.0 + stake.amount.0);
         }
@@ -239,45 +250,22 @@ impl Stakeable {
         return summary;
     }
 
-    // /**
-    //  * Add functionality like burn to the _stake afunction
-    //  *
-    //  */
-    // #[payable]
-    // pub fn stake(&mut self, amount: U128) {
-    //     // A -> sender    => A(client) call B => C
-    //     // B
-    //     // cross contract  C
-    //     // C -> b
-    //     assert!(amount.0 > 0, "amount must be greater than zero");
-    //     env::log_str(&format!(
-    //         "current_account_id={}",
-    //         env::current_account_id().to_string()
-    //     ));
-
-    //     env::log_str(&format!(
-    //         "current_account_id={}",
-    //         env::current_account_id().to_string()
-    //     ));
-
-    //     let account_id = env::predecessor_account_id();
-
-    //     let ext_ft = ext_self::ext(env::current_account_id())
-    //         .with_static_gas(FT_HARVEST_CALLBACK_GAS)
-    //         .with_attached_deposit(NO_DEPOSIT);
-    //     ext_ft::ext(self.nolan_token_id.clone())
-    //         .with_static_gas(FT_HARVEST_CALLBACK_GAS)
-    //         .with_attached_deposit(NO_DEPOSIT)
-    //         .ft_balance_of(account_id.to_string())
-    //         .then(ext_ft.ft_transfer_callback(account_id, env::current_account_id(), amount));
-    // }
-
     /**
      * @notice withdrawStake is used to withdraw stakes from the account holder
      */
-    pub fn withdraw_stake(amount: U128, stake_index: usize) {}
+    pub fn withdraw_stake(&mut self, amount: U128, stake_index: usize) {
+        let claimable_amount = self._with_draw_stake(amount, stake_index);
+        log_str(format!("claimable_amount={}", claimable_amount.0.to_string(),).as_str());
+        // TODO: transfer token to receiver
+    }
+
+    // * readonly
+    pub fn decimals(&self) -> u32 {
+        return self.config.decimals;
+    }
 }
 
+// impl callback
 #[near_bindgen]
 impl Stakeable {
     pub fn ft_on_transfer(
@@ -288,7 +276,18 @@ impl Stakeable {
     ) -> String {
         let processor = env::predecessor_account_id();
         let account_id = env::signer_account_id();
-        assert_ne!(processor, account_id.clone(), "Oops1");
+        log_str(
+            format!(
+                "processor={}, account_id={}",
+                processor.to_string(),
+                account_id.to_string()
+            )
+            .as_str(),
+        );
+        // comment out for testing
+        // let is_contained = self.allowed_token.contains(&processor);
+        // assert!(is_contained, "token is not allow");
+        // assert_ne!(processor, account_id.clone(), "Oops1");
         assert!(amount.0 > 0, "Oops2");
         match msg.as_str() {
             "staking" => {

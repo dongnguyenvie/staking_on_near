@@ -13,7 +13,7 @@ const assetIds = Object.keys(tokenConfig)
 
 const initContract = (wallet: WalletConnection) =>
   new nearAPI.Contract(wallet.account(), STAKING_CONTRACT, {
-    viewMethods: ['has_stake'],
+    viewMethods: ['has_stake', 'decimals'],
     changeMethods: [],
   }) as StakingContract
 
