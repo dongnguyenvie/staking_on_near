@@ -1,8 +1,9 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useMemo, useState } from 'react'
 import { Box } from '@chakra-ui/react'
 import { useQuery } from 'react-query'
 import { useNear } from '#providers/NearProvider'
 import dayjs from '#utils/dayjs'
+import { utils } from 'near-api-js'
 
 export default function Markets() {
   const { stakingContract, accountId, onStake, storageBalance } = useNear()
@@ -17,9 +18,13 @@ export default function Markets() {
     }
   )
 
-  // const { data: decimalsData } = useQuery('staking.decimals', () => contract.decimals(), {
-  //   enabled: ready && !!accountId,
-  // })
+  const { data: rewardPerHour } = useQuery(
+    'staking.reward_per_hour',
+    () => contract.reward_per_hour(),
+    {
+      enabled: ready && !!accountId,
+    }
+  )
 
   // console.log({ stakingData, decimalsData })
   const totalClaimable = useMemo(() => stakingData?.total_amount || 0, [stakingData])
@@ -46,24 +51,22 @@ export default function Markets() {
       <div className="flex flex-wrap">
         <p className="text-lg">Account: {accountId}</p>
         <p className="font-bold w-full">
-          Total claimable token: <span className="text-red-400"> {totalClaimable}</span>
+          Total token staked: <span className="text-red-400"> {totalClaimable}</span>
+        </p>
+        <p className="font-bold w-full">
+          award per hour: <span className="text-red-400"> {rewardPerHour}</span>
         </p>
         <div className="border border-neutral-500 p-2 rounded w-full">
           {stakeds.map((staked, idx) => {
             return (
               <div key={idx} className="border-t border-emerald-700">
                 <p>amount: {staked.amount}</p>
-                <p>reward: {staked.claimable} (decimals = 15)</p>
-                <p>
-                  since: {dayjs(staked.since).format('DD/MM/YYYY HH:MM')} || {staked.since}
-                </p>
+                <p>reward: {utils.format.formatNearAmount(staked.claimable)}</p>
+                <p>since: {dayjs(staked.since).format('DD/MM/YYYY HH:MM')} || </p>
               </div>
             )
           })}
         </div>
-        {/* <div className="w-full">
-          <pre>{JSON.stringify(stakingData, null, 2)}</pre>
-        </div> */}
         <div className="w-full mt-8">
           <input
             type="number"
@@ -82,4 +85,25 @@ export default function Markets() {
       </div>
     </>
   )
+}
+
+function durationAsString(ms: any, maxPrecission = 3) {
+  const duration = dayjs.duration(ms)
+
+  const items = [] as any
+  items.push({ timeUnit: 'd', value: Math.floor(duration.asDays()) })
+  items.push({ timeUnit: 'h', value: duration.hours() })
+  items.push({ timeUnit: 'm', value: duration.minutes() })
+  items.push({ timeUnit: 's', value: duration.seconds() })
+
+  const formattedItems = items.reduce((accumulator, { value, timeUnit }) => {
+    if (accumulator.length >= maxPrecission || (accumulator.length === 0 && value === 0)) {
+      return accumulator
+    }
+
+    accumulator.push(`${value}${timeUnit}`)
+    return accumulator
+  }, [])
+
+  return formattedItems.length !== 0 ? formattedItems.join(' ') : '-'
 }

@@ -213,9 +213,7 @@ impl Stakeable {
         return U128(
             ((duration
                 * current_stake.amount.0
-                * self.config.reward_numerator as u128
-                * self.config.decimals as u128
-                * current_stake.amount.0
+                * u128::pow(10, self.config.decimals)
                 * self.config.reward_numerator as u128)
                 / ONE_HOUR as u128)
                 / self.config.reward_denumerator as u128,
@@ -263,6 +261,14 @@ impl Stakeable {
     pub fn decimals(&self) -> u32 {
         return self.config.decimals;
     }
+
+    pub fn reward_per_hour(&self) -> f32 {
+        return self.config.reward_numerator as f32 / self.config.reward_denumerator as f32;
+    }
+
+    // pub fn update_contract(&mut self) {
+    //     self.config.decimals = 24;
+    // }
 }
 
 // impl callback
