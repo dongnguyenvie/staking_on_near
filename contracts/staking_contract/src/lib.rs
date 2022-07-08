@@ -48,8 +48,8 @@ trait FungibleToken {
 #[serde(crate = "near_sdk::serde")]
 pub struct Stake {
     address: AccountId, // address
-    amount: U128, // amount of staked
-    since: u64, // start
+    amount: U128,       // amount of staked
+    since: u64,         // start
     claimable: U128,
 }
 
@@ -175,10 +175,9 @@ impl Stakeable {
                 current_stake.since = env::block_timestamp_ms();
                 if (current_stake.amount.0 == 0) {
                     stakeholder.address_stakes.remove(index);
-                } else {
-                    // update value
-                    self.stakeholders.insert(&account_id, &stakeholder);
                 }
+                env::log_str(format!("reward={}", account_id.to_string()).as_str());
+                self.stakeholders.insert(&account_id, &stakeholder);
                 return U128(amount.0 + reward.0);
             }
             None => todo!(),
@@ -256,7 +255,13 @@ impl Stakeable {
         // 47450771250000000000000000
         // 474.
         // nep141::transfer(3000)
-        log_str(format!("claimable_amount={}", claimable_amount.0.to_string(),).as_str());
+        log_str(
+            format!(
+                "withdraw_stake::claimable_amount={}",
+                claimable_amount.0.to_string(),
+            )
+            .as_str(),
+        );
         // TODO: transfer token to receiver
     }
 

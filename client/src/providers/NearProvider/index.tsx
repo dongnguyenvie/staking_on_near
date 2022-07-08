@@ -37,6 +37,7 @@ interface INearContext {
   ready: boolean
 
   onStake: (params: { amount: string }) => Promise<any>
+  onWithdrawStake: (payload: { amount: number; index: number }) => void
   accountId: string
   storageBalance: any
 }
@@ -120,6 +121,18 @@ function NearProvider({ children }: NearProviderProps) {
     return resp
   }
 
+  const withdrawStake = async ({ amount, index }: { amount: number; index: number }) => {
+    const { contract, ready } = stakingContract
+    if (!ready) return
+
+    const resp = await contract.withdraw_stake({
+      amount: formatUnits(amount).toString(),
+      stake_index: index,
+    })
+
+    console.log({ resp })
+  }
+
   const fetchStorageBalance = async ({ accountId }: any) => {
     const { contract, ready } = tokenContract
     const resp = await contract.storage_balance_of({ account_id: accountId })
@@ -154,6 +167,7 @@ function NearProvider({ children }: NearProviderProps) {
         onStake: stake,
         accountId: accountId,
         storageBalance: storageBalance,
+        onWithdrawStake: withdrawStake,
       }}
     >
       {children}
