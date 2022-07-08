@@ -4,6 +4,7 @@ import { useQuery } from 'react-query'
 import { useNear } from '#providers/NearProvider'
 import dayjs from '#utils/dayjs'
 import { utils } from 'near-api-js'
+import { formatUnits } from '#utils/number'
 
 export default function Markets() {
   const { stakingContract, accountId, onStake, storageBalance } = useNear()
@@ -51,7 +52,8 @@ export default function Markets() {
       <div className="flex flex-wrap">
         <p className="text-lg">Account: {accountId}</p>
         <p className="font-bold w-full">
-          Total token staked: <span className="text-red-400"> {totalClaimable}</span>
+          Total token staked:{' '}
+          <span className="text-red-400"> {formatUnits(totalClaimable).toString()} TOKEN</span>
         </p>
         <p className="font-bold w-full">
           award per hour: <span className="text-red-400"> {rewardPerHour}</span>
@@ -59,10 +61,17 @@ export default function Markets() {
         <div className="border border-neutral-500 p-2 rounded w-full">
           {stakeds.map((staked, idx) => {
             return (
-              <div key={idx} className="border-t border-emerald-700">
-                <p>amount: {staked.amount}</p>
-                <p>reward: {utils.format.formatNearAmount(staked.claimable)}</p>
-                <p>since: {dayjs(staked.since).format('DD/MM/YYYY HH:MM')} || </p>
+              <div key={idx} className="border-b border-emerald-700 pb-2">
+                <div >
+                  <p>amount: {formatUnits(staked.amount).toString()}</p>
+                  <p>reward: {formatUnits(staked.claimable).decimalPlaces(5).toString()}</p>
+                  <p>since: {dayjs(staked.since).format('DD/MM/YYYY HH:MM')} || </p>
+                </div>
+                <div>
+                  <button className="bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded mt-2">
+                    claim
+                  </button>
+                </div>
               </div>
             )
           })}

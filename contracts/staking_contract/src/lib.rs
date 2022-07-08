@@ -47,9 +47,9 @@ trait FungibleToken {
 #[derive(Serialize, Deserialize, BorshSerialize, BorshDeserialize, Clone)]
 #[serde(crate = "near_sdk::serde")]
 pub struct Stake {
-    address: AccountId,
-    amount: U128,
-    since: u64,
+    address: AccountId, // address
+    amount: U128, // amount of staked
+    since: u64, // start
     claimable: U128,
 }
 
@@ -213,7 +213,7 @@ impl Stakeable {
         return U128(
             ((duration
                 * current_stake.amount.0
-                * u128::pow(10, self.config.decimals)
+                // * u128::pow(10, self.config.decimals)
                 * self.config.reward_numerator as u128)
                 / ONE_HOUR as u128)
                 / self.config.reward_denumerator as u128,
@@ -253,6 +253,9 @@ impl Stakeable {
      */
     pub fn withdraw_stake(&mut self, amount: U128, stake_index: usize) {
         let claimable_amount = self._with_draw_stake(amount, stake_index);
+        // 47450771250000000000000000
+        // 474.
+        // nep141::transfer(3000)
         log_str(format!("claimable_amount={}", claimable_amount.0.to_string(),).as_str());
         // TODO: transfer token to receiver
     }

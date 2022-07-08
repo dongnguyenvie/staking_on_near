@@ -4,6 +4,7 @@ import { ConnectConfig, Near, utils, WalletConnection } from 'near-api-js'
 import { useStakingContract } from './useStakingContract'
 import { useTokenContract } from './useTokenContract'
 import { STAKING_CONTRACT } from '#utils/constants'
+import { formatUnits } from '#utils/number'
 
 const nearConfig: ConnectConfig = {
   networkId: 'testnet',
@@ -105,8 +106,13 @@ function NearProvider({ children }: NearProviderProps) {
   const stake = async ({ amount }: { amount: string }) => {
     const { contract, ready } = tokenContract
     if (!ready) return
+
     const resp = await contract.ft_transfer_call(
-      { receiver_id: STAKING_CONTRACT, amount: amount, msg: 'staking' },
+      {
+        receiver_id: STAKING_CONTRACT,
+        amount: formatUnits(amount, -18).toString(),
+        msg: 'staking',
+      },
       '300000000000000',
       '1'
     )
