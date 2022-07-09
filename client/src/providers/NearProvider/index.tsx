@@ -5,6 +5,7 @@ import { useStakingContract } from './useStakingContract'
 import { useTokenContract } from './useTokenContract'
 import { STAKING_CONTRACT } from '#utils/constants'
 import { formatUnits } from '#utils/number'
+import BigNumber from 'bignumber.js'
 
 const nearConfig: ConnectConfig = {
   networkId: 'testnet',
@@ -126,11 +127,9 @@ function NearProvider({ children }: NearProviderProps) {
     if (!ready) return
 
     const resp = await contract.withdraw_stake({
-      amount: formatUnits(amount).toString(),
+      amount: formatUnits(amount, -18).toString(10),
       stake_index: index,
     })
-
-    console.log({ resp })
   }
 
   const fetchStorageBalance = async ({ accountId }: any) => {

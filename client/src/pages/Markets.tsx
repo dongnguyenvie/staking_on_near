@@ -72,9 +72,7 @@ export default function Markets() {
                 </div>
                 <div>
                   <Claimable
-                    defaultAmount={formatUnits(staked.claimable)
-                      .plus(formatUnits(staked.claimable))
-                      .toNumber()}
+                    defaultAmount={formatUnits(staked.amount).toNumber()}
                     onWithdrawStake={handleWithdrawStake}
                     index={idx}
                   />

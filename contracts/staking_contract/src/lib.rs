@@ -162,6 +162,16 @@ impl Stakeable {
      * Will also calculateStakeReward and reset timer
      */
     fn _with_draw_stake(&mut self, amount: U128, index: usize) -> U128 {
+        /***
+         * stakeholder: {
+         *  address_stakes: [
+         *      {
+         *      },
+         *      {
+         *      }
+         *  ]
+         * }
+         */
         let account_id = env::signer_account_id();
         match self.stakeholders.get(&account_id) {
             Some(mut stakeholder) => {
@@ -171,12 +181,14 @@ impl Stakeable {
                     "Staking: Cannot withdraw more than you have staked"
                 );
                 let reward = self.calculate_stake_reward(current_stake.clone());
+                env::log_str(
+                    format!("current_stake={}, {}", current_stake.amount.0, amount.0).as_str(),
+                );
                 current_stake.amount = U128(current_stake.amount.0 - amount.0);
                 current_stake.since = env::block_timestamp_ms();
                 if (current_stake.amount.0 == 0) {
                     stakeholder.address_stakes.remove(index);
                 }
-                env::log_str(format!("reward={}", account_id.to_string()).as_str());
                 self.stakeholders.insert(&account_id, &stakeholder);
                 return U128(amount.0 + reward.0);
             }
@@ -255,13 +267,7 @@ impl Stakeable {
         // 47450771250000000000000000
         // 474.
         // nep141::transfer(3000)
-        log_str(
-            format!(
-                "withdraw_stake::claimable_amount={}",
-                claimable_amount.0.to_string(),
-            )
-            .as_str(),
-        );
+        log_str(format!("claimable_amount={}", claimable_amount.0.to_string(),).as_str());
         // TODO: transfer token to receiver
     }
 
