@@ -3,10 +3,10 @@ import { Box } from '@chakra-ui/react'
 import { useQuery } from 'react-query'
 import { useNear } from '#providers/NearProvider'
 import dayjs from '#utils/dayjs'
-import { utils } from 'near-api-js'
+import { formatUnits } from '#utils/number'
 
 export default function Markets() {
-  const { stakingContract, accountId, onStake, storageBalance } = useNear()
+  const { stakingContract, accountId, onStake, storageBalance, onWithdrawStake } = useNear()
   const { contract, ready } = stakingContract
   const [amount, setAmount] = useState(3000)
 
@@ -26,12 +26,15 @@ export default function Markets() {
     }
   )
 
-  // console.log({ stakingData, decimalsData })
   const totalClaimable = useMemo(() => stakingData?.total_amount || 0, [stakingData])
   const stakeds = useMemo(() => stakingData?.stakes || [], [stakingData])
 
   const handleStake = () => {
     onStake({ amount: `${amount}` })
+  }
+
+  const handleWithdrawStake = ({ amount, index }: any) => {
+    onWithdrawStake({ amount, index })
   }
 
   if (!accountId) {
@@ -51,18 +54,29 @@ export default function Markets() {
       <div className="flex flex-wrap">
         <p className="text-lg">Account: {accountId}</p>
         <p className="font-bold w-full">
-          Total token staked: <span className="text-red-400"> {totalClaimable}</span>
+          Total token staked:{' '}
+          <span className="text-red-400"> {formatUnits(totalClaimable).toString()} TOKEN</span>
         </p>
         <p className="font-bold w-full">
           award per hour: <span className="text-red-400"> {rewardPerHour}</span>
         </p>
-        <div className="border border-neutral-500 p-2 rounded w-full">
+        <p>xxx:{stakeds.length}</p>
+        <div className="border border-neutral-500 p-2 rounded w-full mt-5">
           {stakeds.map((staked, idx) => {
             return (
-              <div key={idx} className="border-t border-emerald-700">
-                <p>amount: {staked.amount}</p>
-                <p>reward: {utils.format.formatNearAmount(staked.claimable)}</p>
-                <p>since: {dayjs(staked.since).format('DD/MM/YYYY HH:MM')} || </p>
+              <div key={idx} className="border-b border-emerald-700 pb-2">
+                <div>
+                  <p>amount: {formatUnits(staked.amount).toString()}</p>
+                  <p>reward: {formatUnits(staked.claimable).decimalPlaces(5).toString()}</p>
+                  <p>since: {dayjs(staked.since).format('DD/MM/YYYY HH:MM')} || </p>
+                </div>
+                <div>
+                  <Claimable
+                    defaultAmount={formatUnits(staked.amount).toNumber()}
+                    onWithdrawStake={handleWithdrawStake}
+                    index={idx}
+                  />
+                </div>
               </div>
             )
           })}
@@ -87,23 +101,42 @@ export default function Markets() {
   )
 }
 
-function durationAsString(ms: any, maxPrecission = 3) {
-  const duration = dayjs.duration(ms)
+const Claimable = ({
+  defaultAmount,
+  onWithdrawStake,
+  index,
+}: {
+  defaultAmount: number
+  onWithdrawStake: ({ amount, index }: { amount: number; index: number }) => void
+  index: number
+}) => {
+  const [amount, setAmount] = useState(defaultAmount)
 
-  const items = [] as any
-  items.push({ timeUnit: 'd', value: Math.floor(duration.asDays()) })
-  items.push({ timeUnit: 'h', value: duration.hours() })
-  items.push({ timeUnit: 'm', value: duration.minutes() })
-  items.push({ timeUnit: 's', value: duration.seconds() })
+  const handleChange = (e: any) => {
+    let value = +e.target.value
+    setAmount(value > defaultAmount ? defaultAmount : value)
+    // setAmount(value)
+  }
 
-  const formattedItems = items.reduce((accumulator, { value, timeUnit }) => {
-    if (accumulator.length >= maxPrecission || (accumulator.length === 0 && value === 0)) {
-      return accumulator
-    }
+  const handleWithdrawStake = () => {
+    onWithdrawStake({ amount, index })
+  }
 
-    accumulator.push(`${value}${timeUnit}`)
-    return accumulator
-  }, [])
-
-  return formattedItems.length !== 0 ? formattedItems.join(' ') : '-'
+  return (
+    <div className="flex items-center">
+      <button
+        className="bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded"
+        onClick={handleWithdrawStake}
+      >
+        Claim
+      </button>
+      <input
+        type="number"
+        className="ml-2 form-control block w-full px-3 py-2 text-base font-normal text-gray-700 bg-white bg-clip-padding border border-solid border-gray-300 rounded transition ease-in-out m-0 focus:text-gray-700 focus:bg-white focus:border-blue-600 focus:outline-none"
+        value={amount}
+        onChange={handleChange}
+        placeholder="Number input"
+      />
+    </div>
+  )
 }

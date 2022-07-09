@@ -14,7 +14,7 @@ const assetIds = Object.keys(tokenConfig)
 const initContract = (wallet: WalletConnection) =>
   new nearAPI.Contract(wallet.account(), STAKING_CONTRACT, {
     viewMethods: ['has_stake', 'decimals', 'reward_per_hour'],
-    changeMethods: [],
+    changeMethods: ['withdraw_stake'],
   }) as StakingContract
 
 interface StakingContractProps {

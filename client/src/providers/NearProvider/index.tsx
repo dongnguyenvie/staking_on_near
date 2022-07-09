@@ -4,6 +4,8 @@ import { ConnectConfig, Near, utils, WalletConnection } from 'near-api-js'
 import { useStakingContract } from './useStakingContract'
 import { useTokenContract } from './useTokenContract'
 import { STAKING_CONTRACT } from '#utils/constants'
+import { formatUnits } from '#utils/number'
+import BigNumber from 'bignumber.js'
 
 const nearConfig: ConnectConfig = {
   networkId: 'testnet',
@@ -36,6 +38,7 @@ interface INearContext {
   ready: boolean
 
   onStake: (params: { amount: string }) => Promise<any>
+  onWithdrawStake: (payload: { amount: number; index: number }) => void
   accountId: string
   storageBalance: any
 }
@@ -105,13 +108,28 @@ function NearProvider({ children }: NearProviderProps) {
   const stake = async ({ amount }: { amount: string }) => {
     const { contract, ready } = tokenContract
     if (!ready) return
+
     const resp = await contract.ft_transfer_call(
-      { receiver_id: STAKING_CONTRACT, amount: amount, msg: 'staking' },
+      {
+        receiver_id: STAKING_CONTRACT,
+        amount: formatUnits(amount, -18).toString(),
+        msg: 'staking',
+      },
       '300000000000000',
       '1'
     )
 
     return resp
+  }
+
+  const withdrawStake = async ({ amount, index }: { amount: number; index: number }) => {
+    const { contract, ready } = stakingContract
+    if (!ready) return
+
+    const resp = await contract.withdraw_stake({
+      amount: formatUnits(amount, -18).toString(10),
+      stake_index: index,
+    })
   }
 
   const fetchStorageBalance = async ({ accountId }: any) => {
@@ -148,6 +166,7 @@ function NearProvider({ children }: NearProviderProps) {
         onStake: stake,
         accountId: accountId,
         storageBalance: storageBalance,
+        onWithdrawStake: withdrawStake,
       }}
     >
       {children}

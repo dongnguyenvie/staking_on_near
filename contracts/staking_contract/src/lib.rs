@@ -47,9 +47,9 @@ trait FungibleToken {
 #[derive(Serialize, Deserialize, BorshSerialize, BorshDeserialize, Clone)]
 #[serde(crate = "near_sdk::serde")]
 pub struct Stake {
-    address: AccountId,
-    amount: U128,
-    since: u64,
+    address: AccountId, // address
+    amount: U128,       // amount of staked
+    since: u64,         // start
     claimable: U128,
 }
 
@@ -162,6 +162,16 @@ impl Stakeable {
      * Will also calculateStakeReward and reset timer
      */
     fn _with_draw_stake(&mut self, amount: U128, index: usize) -> U128 {
+        /***
+         * stakeholder: {
+         *  address_stakes: [
+         *      {
+         *      },
+         *      {
+         *      }
+         *  ]
+         * }
+         */
         let account_id = env::signer_account_id();
         match self.stakeholders.get(&account_id) {
             Some(mut stakeholder) => {
@@ -171,14 +181,15 @@ impl Stakeable {
                     "Staking: Cannot withdraw more than you have staked"
                 );
                 let reward = self.calculate_stake_reward(current_stake.clone());
+                env::log_str(
+                    format!("current_stake={}, {}", current_stake.amount.0, amount.0).as_str(),
+                );
                 current_stake.amount = U128(current_stake.amount.0 - amount.0);
                 current_stake.since = env::block_timestamp_ms();
                 if (current_stake.amount.0 == 0) {
                     stakeholder.address_stakes.remove(index);
-                } else {
-                    // update value
-                    self.stakeholders.insert(&account_id, &stakeholder);
                 }
+                self.stakeholders.insert(&account_id, &stakeholder);
                 return U128(amount.0 + reward.0);
             }
             None => todo!(),
@@ -213,7 +224,7 @@ impl Stakeable {
         return U128(
             ((duration
                 * current_stake.amount.0
-                * u128::pow(10, self.config.decimals)
+                // * u128::pow(10, self.config.decimals)
                 * self.config.reward_numerator as u128)
                 / ONE_HOUR as u128)
                 / self.config.reward_denumerator as u128,
@@ -253,6 +264,9 @@ impl Stakeable {
      */
     pub fn withdraw_stake(&mut self, amount: U128, stake_index: usize) {
         let claimable_amount = self._with_draw_stake(amount, stake_index);
+        // 47450771250000000000000000
+        // 474.
+        // nep141::transfer(3000)
         log_str(format!("claimable_amount={}", claimable_amount.0.to_string(),).as_str());
         // TODO: transfer token to receiver
     }
