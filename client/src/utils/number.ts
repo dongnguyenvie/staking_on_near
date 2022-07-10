@@ -1,5 +1,7 @@
 import BigNumber from 'bignumber.js'
-
+BigNumber.config({
+  ROUNDING_MODE: BigNumber.ROUND_DOWN,
+})
 export const tokenDecimal = new BigNumber(10).pow(16)
 
 export const formatUnits = (bignum: string | number, decimal = 18) => {

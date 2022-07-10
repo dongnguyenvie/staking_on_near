@@ -7,6 +7,8 @@ export interface TokenNep141Contract extends Contract {
     attachedDeposit?: string
   ): Promise<any>
 
+  ft_balance_of(payload: { account_id: string }): Promise<string>
+
   storage_balance_of(payload: {
     account_id: string
   }): Promise<null | { total: string; available: string }>
