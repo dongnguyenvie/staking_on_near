@@ -32,6 +32,13 @@ trait FungibleToken {
         msg: String,
     ) -> U128;
 
+    fn ft_resolve_transfer(
+        &mut self,
+        sender_id: AccountId,
+        receiver_id: AccountId,
+        amount: U128,
+    ) -> U128;
+
     // view methods
     fn ft_total_supply(&self) -> String;
     fn ft_balance_of(&self, account_id: String) -> String;
@@ -162,16 +169,6 @@ impl Stakeable {
      * Will also calculateStakeReward and reset timer
      */
     fn _with_draw_stake(&mut self, amount: U128, index: usize) -> U128 {
-        /***
-         * stakeholder: {
-         *  address_stakes: [
-         *      {
-         *      },
-         *      {
-         *      }
-         *  ]
-         * }
-         */
         let account_id = env::signer_account_id();
         match self.stakeholders.get(&account_id) {
             Some(mut stakeholder) => {
@@ -263,11 +260,18 @@ impl Stakeable {
      * @notice withdrawStake is used to withdraw stakes from the account holder
      */
     pub fn withdraw_stake(&mut self, amount: U128, stake_index: usize) {
+        let account_id = env::signer_account_id();
         let claimable_amount = self._with_draw_stake(amount, stake_index);
-        // 47450771250000000000000000
-        // 474.
-        // nep141::transfer(3000)
+        let token: AccountId = "dev-1653846714290-58446128043200".parse().unwrap();
         log_str(format!("claimable_amount={}", claimable_amount.0.to_string(),).as_str());
+        ext_ft::ext(token)
+            .with_static_gas(FT_TRANSFER_GAS)
+            .with_attached_deposit(DEPOSIT_ONE_YOCTO)
+            .ft_transfer(
+                account_id.to_string(),
+                claimable_amount.0.to_string(),
+                Some("0".to_string()),
+            );
         // TODO: transfer token to receiver
     }
 
@@ -279,10 +283,6 @@ impl Stakeable {
     pub fn reward_per_hour(&self) -> f32 {
         return self.config.reward_numerator as f32 / self.config.reward_denumerator as f32;
     }
-
-    // pub fn update_contract(&mut self) {
-    //     self.config.decimals = 24;
-    // }
 }
 
 // impl callback
@@ -293,7 +293,7 @@ impl Stakeable {
         sender_id: ValidAccountId,
         amount: U128,
         msg: String,
-    ) -> String {
+    ) -> PromiseOrValue<U128> {
         let processor = env::predecessor_account_id();
         let account_id = env::signer_account_id();
         log_str(
@@ -309,16 +309,32 @@ impl Stakeable {
         // assert!(is_contained, "token is not allow");
         // assert_ne!(processor, account_id.clone(), "Oops1");
         assert!(amount.0 > 0, "Oops2");
+
+        let mut result = 0;
+
         match msg.as_str() {
             "staking" => {
                 self._stake(sender_id.clone(), amount);
+
+                // let token: AccountId = "dev-1653846714290-58446128043200".parse().unwrap();
+                // let receiver = env::current_account_id();
+                // ext_ft::ext(token)
+                //     .with_static_gas(FT_TRANSFER_GAS)
+                //     .with_attached_deposit(DEPOSIT_ONE_YOCTO)
+                //     .ft_resolve_transfer(sender_id.clone(), receiver, amount);
+
                 format!(
                     "Account={} stake {} is successfully",
                     sender_id.to_string(),
                     amount.0.to_string()
-                )
+                );
+                result = 1;
+                // PromiseOrValue::Value(U128(1))
             }
-            _ => "Oops".to_string(),
+            _ => {
+                "Oops".to_string();
+            }
         }
+        PromiseOrValue::Value(U128(result))
     }
 }

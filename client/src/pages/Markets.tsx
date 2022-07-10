@@ -4,9 +4,11 @@ import { useQuery } from 'react-query'
 import { useNear } from '#providers/NearProvider'
 import dayjs from '#utils/dayjs'
 import { formatUnits } from '#utils/number'
+import { STAKING_CONTRACT } from '#utils/constants'
 
 export default function Markets() {
-  const { stakingContract, accountId, onStake, storageBalance, onWithdrawStake } = useNear()
+  const { stakingContract, accountId, onStake, storageBalance, onWithdrawStake, tokenContract } =
+    useNear()
   const { contract, ready } = stakingContract
   const [amount, setAmount] = useState(3000)
 
@@ -15,6 +17,22 @@ export default function Markets() {
     () => contract.has_stake({ staker: accountId }),
     {
       enabled: ready && !!accountId,
+    }
+  )
+
+  const { data: balance } = useQuery(
+    'staking.ft_balance_of',
+    () => tokenContract.contract.ft_balance_of({ account_id: accountId }),
+    {
+      enabled: tokenContract.ready && !!accountId,
+    }
+  )
+
+  const { data: balance2 } = useQuery(
+    'staking.ft_balance_of2',
+    () => tokenContract.contract.ft_balance_of({ account_id: STAKING_CONTRACT }),
+    {
+      enabled: tokenContract.ready && !!accountId,
     }
   )
 
@@ -49,9 +67,13 @@ export default function Markets() {
     return <div>U need to storage_deposit to dev-1653846714290-58446128043200</div>
   }
 
+  console.log({ balance, balance2 })
+
   return (
     <>
       <div className="flex flex-wrap">
+        <p className="w-full">your wallet of contract: {formatUnits(balance2 || 0).toString()}</p>
+        <p className="w-full">your wallet: {formatUnits(balance || 0).toString()}</p>
         <p className="text-lg">Account: {accountId}</p>
         <p className="font-bold w-full">
           Total token staked:{' '}

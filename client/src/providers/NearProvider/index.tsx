@@ -35,6 +35,7 @@ interface INearContext {
   wallet: WalletConnection
   onSignIn: () => void
   stakingContract: ReturnType<typeof useStakingContract>
+  tokenContract: ReturnType<typeof useTokenContract>
   ready: boolean
 
   onStake: (params: { amount: string }) => Promise<any>
@@ -112,7 +113,7 @@ function NearProvider({ children }: NearProviderProps) {
     const resp = await contract.ft_transfer_call(
       {
         receiver_id: STAKING_CONTRACT,
-        amount: formatUnits(amount, -18).toString(),
+        amount: formatUnits(amount, -18).toString(10),
         msg: 'staking',
       },
       '300000000000000',
@@ -166,6 +167,7 @@ function NearProvider({ children }: NearProviderProps) {
         onStake: stake,
         accountId: accountId,
         storageBalance: storageBalance,
+        tokenContract: tokenContract,
         onWithdrawStake: withdrawStake,
       }}
     >
